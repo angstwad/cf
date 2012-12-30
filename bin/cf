@@ -1,0 +1,280 @@
+#!/usr/bin/env python
+
+# Copyright 2012 Paul Durivage <pauldurivage at gmail dot com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+################################################
+#
+# cf -- A CLI to Cloud Files
+#
+# Requires: python-cloudfiles
+#
+# Installation of requires:
+#   $ sudo pip install python-cloudfiles
+#       OR
+#   $ sudo easy_install python-cloudfiles
+#
+# BEWARE: Haven't tested on Windows, and os module includes are not Windows-safe!
+#
+# Author's Notes: Basic implementation of features: We can get, put, list, and delete stuff.
+# There's a lot left to be desired in this prog, but it fills a gap.  I couldn't find a
+# CLI to object storage, so I made one.  Numerous features have been left out at this time,
+# notably the ability to publish objects and get their URLs. Fixes will come sooner or later.
+#
+######################
+
+import argparse
+import ConfigParser
+import os
+import sys
+
+try:
+    import cloudfiles
+    import cloudfiles.errors
+except ImportError as e:
+    print "cf requires the python-cloudfiles module -- please install this module."
+    sys.exit(1)
+
+__author__ = 'Paul Durivage <paul durivage at gmail dot com>'
+__version__ = '0.1'
+
+def do_rax_connection(creds):
+    try:
+        # Returns connection object
+        return cloudfiles.get_connection(creds['user'], creds['apikey'])
+    except cloudfiles.errors.AuthenticationFailed as e:
+        print "Authentication to the Cloud Files API has failed: " + e.message
+    except cloudfiles.errors.AuthenticationError as e:
+        print "Authentication to the Cloud Files API has failed: there was an unspecified error."
+        print e.message
+    except:
+        raise
+
+def get_container_objects(selected_container):
+    return selected_container.get_objects()
+
+def get_container(cf_conn, requested_container):
+    containers = cf_conn.get_all_containers()
+    for (index, item) in enumerate(containers):
+        if str(item).strip() == requested_container:
+            return containers[index]
+    # If the container doesn't exist
+    raise cloudfiles.errors.NoSuchContainer("Container not found: %s" % requested_container)
+
+def cont_list(cf_conn):
+    for container in cf_conn.get_all_containers():
+        print container
+    print '\n' + repr(cf_conn.get_all_containers())
+
+def cont_create(cf_conn, container_name):
+    new_container = None
+    try:
+        new_container = cf_conn.create_container(container_name, error_on_existing=True)
+    except cloudfiles.errors.ContainerExists as e:
+        print "Container '%s' already exists." % e.message
+    if isinstance(new_container, cloudfiles.Container):
+        print "Container created successfully."
+
+def cont_delete(cf_conn, container_name):
+    try:
+        cf_conn.delete_container(container_name)
+    except cloudfiles.errors.ContainerNotEmpty as e:
+        print "Could not delete '%s': Container Not Empty" % e.container_name
+    except:
+        raise
+    else:
+        print "%s deleted successfully." % container_name
+
+def cont_action(args, creds):
+    cf_conn = do_rax_connection(creds)
+    if args.create:
+        cont_create(cf_conn, args.container)
+    elif args.delete:
+        cont_delete(cf_conn, args.container)
+    else:
+        pass
+
+def obj_list(objects):
+    for object in objects:
+        print object.name
+    print '\n' + repr(objects)
+
+def obj_delete(selected_file, selected_container):
+    try:
+        for file in selected_file:
+            selected_container.delete_object(file)
+            print "Deleted '%s'." % file
+    except cloudfiles.errors.ResponseError as e:
+        print "Error %s, code: %s." % (e.reason, e.status)
+    except:
+        raise
+
+def obj_action(args, creds):
+    cf_conn = do_rax_connection(creds)
+    try:
+        selected_container = get_container(cf_conn, args.container)
+    except cloudfiles.errors.NoSuchContainer as e:
+        print e.message
+        sys.exit(1)
+    except:
+        raise
+
+    # Delete obj
+    if args.delete:
+        obj_delete(args.file, selected_container)
+
+def list_action(args, creds):
+    cf_conn = do_rax_connection(creds)
+    # List container objects
+    if args.container != "all":
+        try:
+            selected_container = get_container(cf_conn, args.container)
+        except cloudfiles.errors.NoSuchContainer as e:
+            print e.message
+            sys.exit(1)
+        except:
+            raise
+        objects = get_container_objects(selected_container)
+        # List objs in container
+        obj_list(objects)
+    # Just list containers
+    elif args.container == "all":
+        cont_list(cf_conn)
+    else:
+        raise cloudfiles.errors.NoSuchContainer('No container found')
+
+def file_progress(count=0, *arg):
+    # TODO: Make this work
+    if count % 20 == 0:
+        sys.stdout.write('.')
+    else:
+        count += 1
+        file_progress(count=count)
+
+def put_file(container, file):
+    # With a container obj, create the object in the Obj Store using the file basename, then put the obj data
+    # there with our local file.
+    container.create_object(os.path.basename(file)).load_from_filename(file)
+
+def get_file(container, dir, file):
+    # Pull the obj down from CF and save to disk.
+    container.get_object(file).save_to_filename(str(dir + file))
+
+def put_action(args, creds):
+    cf_conn = do_rax_connection(creds)
+    select_container = get_container(cf_conn, args.container)
+    for file in args.file:
+        f_basename = os.path.basename(file)
+        sys.stdout.write("Putting %s. " % f_basename)
+        put_file(select_container, file)
+        sys.stdout.write("\t\t Done!\n")
+
+def get_action(args, creds):
+    # Make a proper file path with a trailing /.  Unix-y.
+    if args.dest is None:
+        dir  = os.getcwd() + '/'
+    elif args.dest is not None:
+        dir = os.path.abspath(args.dest) + '/'
+
+    # Boilerplate go-connect cf_conn stuff, then grab our container obj
+    cf_conn = do_rax_connection(creds)
+    selected_container = get_container(cf_conn, args.container)
+    # Get files, plus a little verbosity to let people know we're doing something
+    for file in args.file:
+        get_file(selected_container, dir, file)
+
+def arg_parser():
+    parser = argparse.ArgumentParser(description='A CLI to Rackspace Cloud Files', prog='cf')
+    subparser = parser.add_subparsers()
+
+    # Arguments for actions on containers
+    container_parser = subparser.add_parser('cont', help='container actions')
+    cont_group =  container_parser.add_mutually_exclusive_group(required=True)
+    cont_group.add_argument('-D', '--delete', action='store_true', help='delete container')
+    cont_group.add_argument('-C', '--create', action='store_true', help='create container')
+    container_parser.add_argument('-c', '--container', help='container on which to perform action')
+    container_parser.set_defaults(func=cont_action)
+
+    # Object arguments
+    obj_parser = subparser.add_parser('obj', help='object (file) actions')
+    obj_group = obj_parser.add_mutually_exclusive_group(required=True)
+    obj_group.add_argument('-d', '--delete', action='store_true', help='delete file')
+    obj_parser.add_argument('container', help='container name')
+    obj_parser.add_argument('file', nargs='+', help='file(s) or object(s) to perform actions on')
+    obj_parser.set_defaults(func=obj_action)
+    # TODO: implement get-URI-if-pub args
+
+    # List action arguments
+    list_parser = subparser.add_parser('list', help='list actions')
+    list_parser.add_argument('container', metavar="[container] or 'all'",
+        help="container name, or 'all' to list all containers.")
+    list_parser.set_defaults(func=list_action)
+
+    # Put-file arguments
+    put_parser = subparser.add_parser('put', help='put actions')
+    put_parser.add_argument('container', action='store', help='container to put file(s) into')
+    put_parser.add_argument('file', nargs='+', help='file(s) to put')
+    put_parser.set_defaults(func=put_action)
+
+    # Get-file arguments
+    get_parser = subparser.add_parser('get', help='get actions')
+    get_parser.add_argument('container', action='store', help='container to get file(s) from')
+    get_parser.add_argument('file', nargs='+', help='file(s) to get')
+    get_parser.add_argument('-d', '--dest', help='local destination of file(s)')
+    get_parser.set_defaults(func=get_action)
+
+# Optional Arguments
+    parser.add_argument('-V', '--version', action='version', version="CLI Files "+ __version__,
+        help="Print the version and exit")
+
+    # Return the parsed args
+    return parser.parse_args()
+
+def config_parser():
+        # Define the config file as $HOME/.cf
+        cfgfile = os.environ['HOME'] + '/.cf'
+
+        # If the config file doesn't exist
+        if not os.path.exists(cfgfile):
+            print "No default config exists at ~/.cf: Creating one"
+            config = ConfigParser.RawConfigParser()
+            config.add_section('API_Info')
+            config.set('API_Info', 'username', 'someuser')
+            config.set('API_Info', 'apikey', 'd1774cf48bec77a0a489a4b124c3a6478876b610')
+            with open(cfgfile, 'a+') as configfile:
+                config.write(configfile)
+            print "Please edit the configuration at ~/.cf and rerun this program."
+        # If the config file exists, read it
+        elif os.path.exists(cfgfile):
+            config = ConfigParser.RawConfigParser()
+            config.read(cfgfile)
+            username = config.get('API_Info', 'username')
+            apikey = config.get('API_Info', 'apikey')
+            return {'user': username, 'apikey': apikey}
+        # Otherwise...
+        else:
+            print ("""Cannot create or read a configuration file.  Please ensure the
+             current user has read/write permissions to %s""", cfgfile)
+            sys.exit(1)
+
+def main():
+    creds = config_parser()
+    args = arg_parser()
+    args.func(args, creds)
+
+if __name__ == '__main__':
+    try:
+        main()
+    except:
+        raise
