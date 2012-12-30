@@ -55,12 +55,5 @@ On the first run, a config file is tossed into your home folder at `~/.cf`.  Upd
 
 ## Info
  
-Requires: python-cloudfiles
-
-Installation of Requisites:  
-`$ sudo pip install python-cloudfiles`    
-**OR**    
-`$ sudo easy_install python-cloudfiles`
-
 **Haven't tested on Windows, and os module includes are not Windows-safe!**
 
