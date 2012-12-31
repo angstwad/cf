@@ -27,7 +27,9 @@ In the future, I hope it'll also:
 
 ### With pip or easy_install:
 
-Just kidding.  Not implemented yet.
+`$ sudo pip install cf`   
+**OR**    
+`$ sudo easy_install cf`
 
 ### Requires
 #### python-cloudfiles
