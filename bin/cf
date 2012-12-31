@@ -195,7 +195,7 @@ def get_action(args, creds):
         get_file(selected_container, dir, file)
 
 def arg_parser():
-    parser = argparse.ArgumentParser(description='A CLI to Rackspace Cloud Files', prog='cf')
+    parser = argparse.ArgumentParser(description='cf - A command line clent to Rackspace Cloud Files', prog='cf')
     subparser = parser.add_subparsers()
 
     # Arguments for actions on containers
