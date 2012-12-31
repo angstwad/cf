@@ -47,7 +47,7 @@ except ImportError as e:
     sys.exit(1)
 
 __author__ = 'Paul Durivage <paul durivage at gmail dot com>'
-__version__ = '0.1'
+__version__ = '0.11'
 
 def do_rax_connection(creds):
     try:

@@ -3,8 +3,8 @@
 from setuptools import setup
 
 setup(name='cf',
-    version='0.1',
-    description='cf -- A CLI to Cloud Files',
+    version='0.11',
+    description='A command line client to Rackspace Cloud Files',
     author='Paul Durivage',
     author_email='pauldurivage@gmail.com',
     license='Apache 2.0',
