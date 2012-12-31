@@ -203,7 +203,7 @@ def arg_parser():
     cont_group =  container_parser.add_mutually_exclusive_group(required=True)
     cont_group.add_argument('-D', '--delete', action='store_true', help='delete container')
     cont_group.add_argument('-C', '--create', action='store_true', help='create container')
-    container_parser.add_argument('-c', '--container', help='container on which to perform action')
+    container_parser.add_argument('container', help='container on which to perform action')
     container_parser.set_defaults(func=cont_action)
 
     # Object arguments
