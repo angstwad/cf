@@ -154,31 +154,28 @@ def list_action(args, creds):
     else:
         raise cloudfiles.errors.NoSuchContainer('No container found')
 
-def file_progress(count=0, *arg):
-    # TODO: Make this work
-    if count % 20 == 0:
-        sys.stdout.write('.')
-    else:
-        count += 1
-        file_progress(count=count)
+def file_progress(*arg):
+    # TODO: Make this work better
+    if arg[0] % 1000 == 0:
+        sys.stdout.write('.'), sys.stdout.flush()
 
 def put_file(container, file):
     # With a container obj, create the object in the Obj Store using the file basename, then put the obj data
     # there with our local file.
-    container.create_object(os.path.basename(file)).load_from_filename(file)
+    container.create_object(os.path.basename(file)).load_from_filename(file, callback=file_progress)
 
 def get_file(container, dir, file):
     # Pull the obj down from CF and save to disk.
-    container.get_object(file).save_to_filename(str(dir + file))
+    container.get_object(file).save_to_filename(str(dir + file), callback=file_progress)
 
 def put_action(args, creds):
     cf_conn = do_rax_connection(creds)
     select_container = get_container(cf_conn, args.container)
     for file in args.file:
         f_basename = os.path.basename(file)
-        sys.stdout.write("Putting %s. " % f_basename)
+        sys.stdout.write("Putting %s." % f_basename), sys.stdout.flush()
         put_file(select_container, file)
-        sys.stdout.write("\t\t Done!\n")
+        sys.stdout.write("\t\t Done!\n"), sys.stdout.flush()
 
 def get_action(args, creds):
     # Make a proper file path with a trailing /.  Unix-y.
@@ -192,7 +189,9 @@ def get_action(args, creds):
     selected_container = get_container(cf_conn, args.container)
     # Get files, plus a little verbosity to let people know we're doing something
     for file in args.file:
+        sys.stdout.write("Getting %s." % file), sys.stdout.flush()
         get_file(selected_container, dir, file)
+        sys.stdout.write("\t\t Done!\n"), sys.stdout.flush()
 
 def arg_parser():
     parser = argparse.ArgumentParser(description='cf - A command line clent to Rackspace Cloud Files', prog='cf')
