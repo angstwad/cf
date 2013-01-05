@@ -3,7 +3,7 @@
 from setuptools import setup
 
 setup(name='cf',
-    version='0.11',
+    version='0.2.0',
     description='A command line client to Rackspace Cloud Files',
     author='Paul Durivage',
     author_email='pauldurivage@gmail.com',
