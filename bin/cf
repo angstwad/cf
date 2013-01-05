@@ -31,7 +31,7 @@ except ImportError as e:
     sys.exit(1)
 
 __author__ = 'Paul Durivage <paul durivage at gmail dot com>'
-__version__ = '0.2.0'
+__version__ = '0.20'
 
 def do_rax_connection(creds):
     """ Authentication handler
