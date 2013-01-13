@@ -31,7 +31,15 @@ except ImportError as e:
     sys.exit(1)
 
 __author__ = 'Paul Durivage <paul durivage at gmail dot com>'
-__version__ = '0.20'
+__version__ = '0.35'
+
+class CredentialsException(Exception):
+    def __init__(self, message):
+        self.message = message
+
+    def message(self):
+        return self.message
+
 
 def do_rax_connection(creds):
     """ Authentication handler
@@ -40,7 +48,7 @@ def do_rax_connection(creds):
     """
     try:
         # Returns connection object
-        return cloudfiles.get_connection(creds['user'], creds['apikey'])
+        return cloudfiles.get_connection(creds[0], creds[1])
     except cloudfiles.errors.AuthenticationFailed as e:
         print "Authentication to the Cloud Files API has failed: " + e.message
     except cloudfiles.errors.AuthenticationError as e:
@@ -57,6 +65,7 @@ def get_container_objects(selected_container):
     """
     return selected_container.get_objects()
 
+
 def get_container(cf_conn, requested_container):
     """ Grabs a container based on its name and returns it
     param: cf_conn as cloudfiles.connection obj
@@ -67,8 +76,9 @@ def get_container(cf_conn, requested_container):
     for (index, item) in enumerate(containers):
         if str(item).strip() == requested_container:
             return containers[index]
-    # If the container doesn't exist
+            # If the container doesn't exist
     raise cloudfiles.errors.NoSuchContainer("Container not found: %s" % requested_container)
+
 
 def cont_list(cf_conn):
     """ List containers
@@ -77,6 +87,7 @@ def cont_list(cf_conn):
     for container in cf_conn.get_all_containers():
         print container
     print '\n' + repr(cf_conn.get_all_containers())
+
 
 def cont_create(cf_conn, container_name):
     """ Container creation handler;
@@ -90,6 +101,7 @@ def cont_create(cf_conn, container_name):
         print "Container '%s' already exists." % e.message
     if isinstance(new_container, cloudfiles.Container):
         print "Container created successfully."
+
 
 def cont_delete(cf_conn, container_name):
     """ Container deletion handler: handles only empty containers ATM
@@ -105,6 +117,7 @@ def cont_delete(cf_conn, container_name):
     else:
         print "%s deleted successfully." % container_name
 
+
 def cont_action(args, creds):
     """ Actions for requests on remote containers
     param: args as a parsed args obj
@@ -118,6 +131,7 @@ def cont_action(args, creds):
     else:
         pass
 
+
 def obj_list(objects):
     """ Object list in a remote container;
     param: objects as cloudfiles.container
@@ -125,6 +139,7 @@ def obj_list(objects):
     for object in objects:
         print object.name
     print '\n' + repr(objects)
+
 
 def obj_delete(selected_file, selected_container):
     """ Object deletion on a remote container
@@ -140,6 +155,7 @@ def obj_delete(selected_file, selected_container):
     except:
         raise
 
+
 def obj_action(args, creds):
     """ Actions for requests on specific objects in remote containers
     param: args as a parsed args obj
@@ -153,9 +169,10 @@ def obj_action(args, creds):
         sys.exit(1)
     except:
         raise
-    # Delete obj
+        # Delete obj
     if args.delete:
         obj_delete(args.file, selected_container)
+
 
 def list_action(args, creds):
     """ Actions for any "list" request
@@ -181,18 +198,21 @@ def list_action(args, creds):
     else:
         raise cloudfiles.errors.NoSuchContainer('No container found')
 
+
 def file_progress(*args):
-    # TODO: Make this work better
-    num = str(int( ( float(args[0]) / float(args[1]) ) * 100))
+    # TODO: Make this clearer and more efficient
+    num = str(int(( float(args[0]) / float(args[1]) ) * 100))
     sys.stdout.write(num)
-    sys.stdout.write('\b'*len(num)), sys.stdout.flush()
+    sys.stdout.write('\b' * len(num)), sys.stdout.flush()
+
 
 def put_file(container, file):
     """ Create a remote object and put a local file into that object
     param: container as cloudfiles.container obj
-    file as a string (a path)
+    param: file as a string (a path)
     """
     container.create_object(os.path.basename(file)).load_from_filename(file, callback=file_progress)
+
 
 def get_file(container, dir, file):
     """ Get actions to download from CF
@@ -203,6 +223,7 @@ def get_file(container, dir, file):
     path_to_file = str(dir + file)
     container.get_object(file).save_to_filename(path_to_file, callback=file_progress)
 
+
 def put_action(args, creds):
     """ Execute file putting actions into CF
     param: args as a parsed args obj
@@ -211,13 +232,18 @@ def put_action(args, creds):
     # Boilerplate go-connect cf_conn stuff, then grab our container obj
     cf_conn = do_rax_connection(creds)
     select_container = get_container(cf_conn, args.container)
+
+    # Build a list of everything but directories
+    files = [f for f in args.file if not os.path.isdir(f)]
+
     # Put files, plus a little verbosity to let people know we're doing something
-    for file in args.file:
-        f_basename = os.path.basename(file)
+    for f in files:
+        f_basename = os.path.basename(f)
         sys.stdout.write("Putting %s\t\t " % f_basename)
         sys.stdout.write('%\b\b\b\b'), sys.stdout.flush()
-        put_file(select_container, file)
+        put_file(select_container, f)
         sys.stdout.write("\b\b\b.......Done!\n"), sys.stdout.flush()
+
 
 def get_action(args, creds):
     """ File getting actions from CF
@@ -226,12 +252,14 @@ def get_action(args, creds):
     """
     # Make a proper file path with a trailing /.  Unix-y.
     if args.dest is None:
-        dir  = os.getcwd() + '/'
+        dir = os.getcwd() + '/'
     elif args.dest is not None:
         dir = os.path.abspath(args.dest) + '/'
+
     # Boilerplate go-connect cf_conn stuff, then grab our container obj
     cf_conn = do_rax_connection(creds)
     selected_container = get_container(cf_conn, args.container)
+
     # Get files, plus a little verbosity to let people know we're doing something
     for file in args.file:
         sys.stdout.write("Getting %s\t\t " % file)
@@ -239,21 +267,29 @@ def get_action(args, creds):
         get_file(selected_container, dir, file)
         sys.stdout.write("\b\b\b.......Done!\n"), sys.stdout.flush()
 
-def cred_args_specified(args, creds):
-    # TODO: What to do if credentials are specified
-    pass
 
-def test_creds_action(args, creds):
-    #  TODO: requesting a connection check against rax
-    pass
+def config_action(args, creds):
+    """ Action function for $ cf config --args stuff.  Creates config, tests login credentials. """
+    if args.create_config is True:
+        create_config()
+
+    # We check for None in creds because action_dispatch() calls this function with None as an arg
+    # when creating a config file.
+    if args.test_login is True and creds is not None:
+        if isinstance(do_rax_connection(creds), cloudfiles.Connection):
+            print "Successfully authenticated to Rackspace Cloud Files.\n"
+
 
 def arg_parser():
+    """ Creates and parses arguments with argparse module
+    returns: argparse argument Namespace
+    """
     parser = argparse.ArgumentParser(description='cf - A command line clent to Rackspace Cloud Files', prog='cf')
     subparser = parser.add_subparsers()
 
     # Arguments for actions on containers
     container_parser = subparser.add_parser('cont', help='container actions')
-    cont_group =  container_parser.add_mutually_exclusive_group(required=True)
+    cont_group = container_parser.add_mutually_exclusive_group(required=True)
     cont_group.add_argument('-D', '--delete', action='store_true', help='delete container')
     cont_group.add_argument('-C', '--create', action='store_true', help='create container')
     container_parser.add_argument('container', help='container on which to perform action')
@@ -266,7 +302,6 @@ def arg_parser():
     obj_parser.add_argument('container', help='container name')
     obj_parser.add_argument('file', nargs='+', help='file(s) or object(s) to perform actions on')
     obj_parser.set_defaults(func=obj_action)
-    # TODO: implement get-URI-if-pub args
 
     # List action arguments
     list_parser = subparser.add_parser('list', help='list actions')
@@ -287,59 +322,159 @@ def arg_parser():
     get_parser.add_argument('-d', '--dest', help='local destination of file(s)')
     get_parser.set_defaults(func=get_action)
 
-    # Test Credentials
-    test_parser = subparser.add_parser('test', help='test login credentials')
-    test_parser.add_argument('--credentials', action='store_true', default=True, help='Test login credentials (default action)')
-    test_parser.set_defaults(func=test_creds_action)
+    # Config Stuff
+    config_parser = subparser.add_parser('config', help='create default config, config test, auth check')
+    config_parser.add_argument('--test-login', action='store_true', default=True,
+        help='Test login credentials (default action)')
+    config_parser.add_argument('--create-config', action='store_true')
+    config_parser.set_defaults(func=config_action)
 
     # Credentails arguments
-    creds_group = parser.add_argument_group(title="Login credentials arguments")
+    creds_group = parser.add_argument_group(title="Login credentials arguments",
+        description="The config file and environment variables may also be used in lieu of specifying command line arguments. See http://github.com/angstwad/cf for more information.")
     creds_group.add_argument('--user', help='Username to use with RAX CF API')
     creds_group.add_argument('--apikey', help='API key to use against RAX CF API')
-#    creds_group.set_defaults(func=cred_args_specified)  # TODO: Test this
 
     # Optional Arguments
-    parser.add_argument('-V', '--version', action='version', version="cf "+ __version__,
+    parser.add_argument('--create-config', action='store_true')
+    parser.add_argument('-V', '--version', action='version', version="cf " + __version__,
         help="Print the version and exit")
 
     # Return the parsed args
     return parser.parse_args()
 
-def config_parser():
-        # Define the config file as $HOME/.cf
-        cfgfile = os.environ['HOME'] + '/.cf'
 
-        # If the config file doesn't exist
-        if not os.path.exists(cfgfile):
-            print "No default config exists at ~/.cf: Creating one"
-            config = ConfigParser.RawConfigParser()
-            config.add_section('API_Info')
-            config.set('API_Info', 'username', 'someuser')
-            config.set('API_Info', 'apikey', 'd1774cf48bec77a0a489a4b124c3a6478876b610')
-            with open(cfgfile, 'a+') as configfile:
-                config.write(configfile)
-            print "Please edit the configuration at ~/.cf and rerun this program."
-        # If the config file exists, read it
-        elif os.path.exists(cfgfile):
-            config = ConfigParser.RawConfigParser()
-            config.read(cfgfile)
-            username = config.get('API_Info', 'username')
-            apikey = config.get('API_Info', 'apikey')
-            return {'user': username, 'apikey': apikey}
-        # Otherwise...
-        else:
-            print ("""Cannot create or read a configuration file.  Please ensure the
+def create_config():
+    """ Creates a configuration file. It does not check if a config file already exists - simply overwrites it
+    with defaults.
+    """
+    cfgfile = os.environ['HOME'] + '/.cf'
+    config = ConfigParser.RawConfigParser()
+    config.add_section('API_Info')
+    config.set('API_Info', 'username', 'someuser')
+    config.set('API_Info', 'apikey', 'd1774cf48bec77a0a489a4b124c3a6478876b610')
+    try:
+        with open(cfgfile, 'w') as configfile:
+            config.write(configfile)
+    except IOError as e:
+        print ("""Cannot create a configuration file.  Please ensure the
              current user has read/write permissions to %s""", cfgfile)
-            sys.exit(1)
+        sys.exit(1)
+    else:
+        print "Please edit the configuration at ~/.cf and rerun this program."
 
-def check_config():
-    # TODO: Check for env variables, cli args, or config file
-    pass
+
+def config_parser():
+    """Parses the configuration and makes the assumption that a $HOME environment variable is set. Does not create a
+    configuration file.  Throws a credentials exception if the file does not exist, or if the config file has not been
+    change from the default stuff we put in there at creation-time.
+    """
+
+    def is_default_config(user, apikey):
+        """ This nested function checks if it looks like the default config hasn't been modified from
+        it's creation-time example/defaults, so that we don't use these BS creds.
+        Raises CredentialsException if config file is default
+        """
+        if user == 'someuser' or apikey == 'd1774cf48bec77a0a489a4b124c3a6478876b610':
+            raise CredentialsException('Configuration file has not been changed from default.')
+
+    # Define the config file as $HOME/.cf
+    cfgfile = os.environ['HOME'] + '/.cf'
+
+    # If the config file doesn't exist
+    if not os.path.exists(cfgfile):
+        raise CredentialsException('Missing config file at ~/.cf')
+
+    # If the config file exists, read it
+    elif os.path.exists(cfgfile):
+        config = ConfigParser.RawConfigParser()
+        config.read(cfgfile)
+        user = config.get('API_Info', 'username')
+        apikey = config.get('API_Info', 'apikey')
+        try:
+            is_default_config(user, apikey)
+        except CredentialsException as e:
+            print e.message, "File: %s" % cfgfile
+        return tuple([user, apikey])
+
+
+def credentialing(args):
+    """ This handles aggregating credentials from the environment variables, the argparser, or from the config file.
+    It will attempt to grab the variables from the CL args first, then envvars, then the config file.  It will piecemeal
+    the first available var from each source independent of the type (meaning, for example, a user arg and an API in the
+    config will work)  A CredentialsException is raised if no credentials are supplied to the program at runtime.
+    """
+    user, apikey = [], []
+    # Grab users first
+    if args.user:
+        user.append(args.user)
+    else:
+        user.append(None)
+    try:
+        if os.environ['CF_USER']:
+            user.append(os.environ['CF_USER'])
+    except KeyError:
+        user.append(None)
+
+    # Grab API keys next
+    if args.apikey:
+        apikey.append(args.apikey)
+    else:
+        apikey.append(None)
+    try:
+        if os.environ['CF_APIKEY']:
+            apikey.append(os.environ['CF_APIKEY'])
+    except KeyError:
+        apikey.append(None)
+
+    def extrapolate(the_list):
+        return filter(lambda x: x is not None, the_list)
+
+    # Config file parsing
+    try:
+        config_creds = config_parser()
+        user.append(config_creds[0])
+        apikey.append(config_creds[1])
+    except CredentialsException:
+        pass
+
+    # Begin sorting the credential lists
+    try:
+        creds = [extrapolate(user)[0], extrapolate(apikey)[0]]
+    except IndexError:
+        raise CredentialsException('No credentials supplied to cf at runtime.')
+    else:
+        return creds
+
+
+def action_dispatch(args):
+    """ Dispatches the appropriate function based on the chosen command line arguments.  config_action dispatch is
+    "different" because we don't want to pass credentials, as it is supposed to be creating our default config.
+    """
+    # This should snag all requests for 'config --create-config at the CLI
+    if args.func is config_action and args.create_config:
+        try:
+            config_action(args, None)
+        # We pass on this because we expect there to be a credentials problem before we create and edit the config!
+        except CredentialsException:
+            pass
+
+    else:
+        creds = None
+        # We want to catch credentials issues here
+        try:
+            creds = credentialing(args)
+        except CredentialsException as e:
+            print e.message
+
+        # Call out to the appropriate *_action function to carry out our desired functionality
+        args.func(args, creds)
+
 
 def main():
-    creds = config_parser()
     args = arg_parser()
-    args.func(args, creds)
+    action_dispatch(args)
+
 
 if __name__ == '__main__':
     try:

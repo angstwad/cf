@@ -1,6 +1,25 @@
 *.py[cod]
-
 .idea/*
+
+# virtualenv
+.Python
+bin/activate
+bin/activate.csh
+bin/activate.fish
+bin/activate_this.py
+bin/easy_install
+bin/easy_install-2.7
+bin/pip
+bin/pip-2.7
+bin/python
+bin/python2
+bin/python2.7
+bin/ip*
+bin/ir*
+bin/py*
+include/
+share/
+
 
 # C extensions
 *.so
