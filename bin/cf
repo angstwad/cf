@@ -43,7 +43,7 @@ class CredentialsException(Exception):
 
 def do_rax_connection(creds):
     """ Authentication handler
-    param: creds as a dict in the form of {'user': value, 'apikey': value}
+    param: creds as tuple in form of (user, apikey) in the form of {'user': value, 'apikey': value}
     Returns cloudfiles.connection object
     """
     try:
@@ -80,7 +80,7 @@ def get_container(cf_conn, requested_container):
     raise cloudfiles.errors.NoSuchContainer("Container not found: %s" % requested_container)
 
 
-def cont_list(cf_conn):
+def container_list_all(cf_conn):
     """ List containers
     param: cf_conn as cloudfiles.connection obj
     """
@@ -121,7 +121,7 @@ def cont_delete(cf_conn, container_name):
 def cont_action(args, creds):
     """ Actions for requests on remote containers
     param: args as a parsed args obj
-    param: creds as a dict
+    param: creds as tuple in form of (user, apikey)
     """
     cf_conn = do_rax_connection(creds)
     if args.create:
@@ -130,6 +130,19 @@ def cont_action(args, creds):
         cont_delete(cf_conn, args.container)
     else:
         pass
+    
+
+def cont_list_objects(cf_conn, select_container):
+    try:
+        select_container = get_container(cf_conn, select_container)
+    except cloudfiles.errors.NoSuchContainer as e:
+        print e.message
+        sys.exit(1)
+    except:
+        raise
+    objects = get_container_objects(select_container)
+    # List objs in container
+    obj_list(objects)
 
 
 def obj_list(objects):
@@ -159,7 +172,7 @@ def obj_delete(selected_file, selected_container):
 def obj_action(args, creds):
     """ Actions for requests on specific objects in remote containers
     param: args as a parsed args obj
-    param: creds as a dict
+    param: creds as tuple in form of (user, apikey)
     """
     cf_conn = do_rax_connection(creds)
     try:
@@ -172,29 +185,21 @@ def obj_action(args, creds):
         # Delete obj
     if args.delete:
         obj_delete(args.file, selected_container)
-
+    
 
 def list_action(args, creds):
     """ Actions for any "list" request
     param: args as a parsed args obj
-    param: creds as a dict
+    param: creds as tuple in form of (user, apikey)
     """
     cf_conn = do_rax_connection(creds)
     # List container objects
     if args.container != "all":
-        try:
-            selected_container = get_container(cf_conn, args.container)
-        except cloudfiles.errors.NoSuchContainer as e:
-            print e.message
-            sys.exit(1)
-        except:
-            raise
-        objects = get_container_objects(selected_container)
-        # List objs in container
-        obj_list(objects)
+        cont_list_objects(cf_conn, args.container)
+
     # Just list containers
     elif args.container == "all":
-        cont_list(cf_conn)
+        container_list_all(cf_conn)
     else:
         raise cloudfiles.errors.NoSuchContainer('No container found')
 
@@ -227,7 +232,7 @@ def get_file(container, dir, file):
 def put_action(args, creds):
     """ Execute file putting actions into CF
     param: args as a parsed args obj
-    param: creds as a dict
+    param: creds as tuple in form of (user, apikey)
     """
     # Boilerplate go-connect cf_conn stuff, then grab our container obj
     cf_conn = do_rax_connection(creds)
@@ -248,7 +253,7 @@ def put_action(args, creds):
 def get_action(args, creds):
     """ File getting actions from CF
     param: args as a parsed args obj
-    param: creds as a dict
+    param: creds as tuple in form of (user, apikey)
     """
     # Make a proper file path with a trailing /.  Unix-y.
     if args.dest is None:
