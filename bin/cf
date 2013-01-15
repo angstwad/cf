@@ -40,6 +40,23 @@ class CredentialsException(Exception):
     def message(self):
         return self.message
 
+def ask_yes_no(question):
+    while True:
+        response = raw_input("%s [y/n] >> " % question)
+        response = response.strip().lower()
+        if response == 'yes' or response == 'y':
+            return True
+        elif response == 'no' or response == 'n':
+            return False
+
+
+def print_iterable(iterable):
+    """ param: iterable object
+    """
+    for item in iterable:
+        print item
+    print '\n' + repr(iterable)
+
 
 def do_rax_connection(creds):
     """ Authentication handler
@@ -54,8 +71,6 @@ def do_rax_connection(creds):
     except cloudfiles.errors.AuthenticationError as e:
         print "Authentication to the Cloud Files API has failed: there was an unspecified error."
         print e.message
-    except:
-        raise
 
 
 def get_container_objects(selected_container):
@@ -76,7 +91,7 @@ def get_container(cf_conn, requested_container):
     for (index, item) in enumerate(containers):
         if str(item).strip() == requested_container:
             return containers[index]
-            # If the container doesn't exist
+    # If the container doesn't exist
     raise cloudfiles.errors.NoSuchContainer("Container not found: %s" % requested_container)
 
 
@@ -84,9 +99,7 @@ def container_list_all(cf_conn):
     """ List containers
     param: cf_conn as cloudfiles.connection obj
     """
-    for container in cf_conn.get_all_containers():
-        print container
-    print '\n' + repr(cf_conn.get_all_containers())
+    print_iterable(cf_conn.get_all_containers())
 
 
 def cont_create(cf_conn, container_name):
@@ -112,8 +125,6 @@ def cont_delete(cf_conn, container_name):
         cf_conn.delete_container(container_name)
     except cloudfiles.errors.ContainerNotEmpty as e:
         print "Could not delete '%s': Container Not Empty" % e.container_name
-    except:
-        raise
     else:
         print "%s deleted successfully." % container_name
 
@@ -130,7 +141,7 @@ def cont_action(args, creds):
         cont_delete(cf_conn, args.container)
     else:
         pass
-    
+
 
 def cont_list_objects(cf_conn, select_container):
     try:
@@ -138,20 +149,10 @@ def cont_list_objects(cf_conn, select_container):
     except cloudfiles.errors.NoSuchContainer as e:
         print e.message
         sys.exit(1)
-    except:
-        raise
-    objects = get_container_objects(select_container)
-    # List objs in container
-    obj_list(objects)
+    else:
+        for object in get_container_objects(select_container):
+            print object.name
 
-
-def obj_list(objects):
-    """ Object list in a remote container;
-    param: objects as cloudfiles.container
-    """
-    for object in objects:
-        print object.name
-    print '\n' + repr(objects)
 
 
 def obj_delete(selected_file, selected_container):
@@ -204,6 +205,10 @@ def list_action(args, creds):
         raise cloudfiles.errors.NoSuchContainer('No container found')
 
 
+def does_file_exist(container, file, loc='remote'):
+    pass
+
+
 def file_progress(*args):
     # TODO: Make this clearer and more efficient
     num = str(int(( float(args[0]) / float(args[1]) ) * 100))
@@ -216,7 +221,14 @@ def put_file(container, file):
     param: container as cloudfiles.container obj
     param: file as a string (a path)
     """
-    container.create_object(os.path.basename(file)).load_from_filename(file, callback=file_progress)
+    def do_put(file):
+        container.create_object(os.path.basename(file)).load_from_filename(file, callback=file_progress)
+
+    if does_file_exist(container, file):
+        if ask_yes_no("File exists: Overwrite?"):
+            do_put(file)
+    else:
+        do_put(file)
 
 
 def get_file(container, dir, file):
@@ -239,7 +251,7 @@ def put_action(args, creds):
     select_container = get_container(cf_conn, args.container)
 
     # Build a list of everything but directories
-    files = [f for f in args.file if not os.path.isdir(f)]
+    files = [ f for f in args.file if not os.path.isdir(f) ]
 
     # Put files, plus a little verbosity to let people know we're doing something
     for f in files:
