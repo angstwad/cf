@@ -55,7 +55,6 @@ def print_iterable(iterable):
     """
     for item in iterable:
         print item
-    print '\n' + repr(iterable)
 
 
 def do_rax_connection(creds):
@@ -73,12 +72,12 @@ def do_rax_connection(creds):
         print e.message
 
 
-def get_container_objects(selected_container):
+def get_container_objects(container_obj):
     """ Handles retrieval of a container's file objects
     param: selected_container as cloudfiles.container object
     Returns: cloudfiles.storage_objects obj
     """
-    return selected_container.get_objects()
+    return container_obj.get_objects()
 
 
 def get_container(cf_conn, requested_container):
@@ -144,25 +143,25 @@ def cont_action(args, creds):
 
 
 def cont_list_objects(cf_conn, select_container):
+    print "in"
     try:
         select_container = get_container(cf_conn, select_container)
     except cloudfiles.errors.NoSuchContainer as e:
         print e.message
         sys.exit(1)
     else:
-        for object in get_container_objects(select_container):
-            print object.name
+        print_iterable([ obj.name for obj in get_container_objects(select_container) ])
+        print get_container_objects(select_container)
 
 
-
-def obj_delete(selected_file, selected_container):
+def obj_delete(selected_file, select_container):
     """ Object deletion on a remote container
     param: file as list of strings
     param: selected_container as cloudfiles.container obj
     """
     try:
         for file in selected_file:
-            selected_container.delete_object(file)
+            select_container.delete_object(file)
             print "Deleted '%s'." % file
     except cloudfiles.errors.ResponseError as e:
         print "Error %s, code: %s." % (e.reason, e.status)
@@ -206,7 +205,13 @@ def list_action(args, creds):
 
 
 def does_file_exist(container, file, loc='remote'):
-    pass
+    if loc == 'remote':
+        if os.path.basename(file) in [ obj.name for obj in get_container_objects(container) ]:
+            return True
+        else:
+            return False
+    else:
+        pass
 
 
 def file_progress(*args):
@@ -216,22 +221,15 @@ def file_progress(*args):
     sys.stdout.write('\b' * len(num)), sys.stdout.flush()
 
 
-def put_file(container, file):
+def upload_file(container, file):
     """ Create a remote object and put a local file into that object
     param: container as cloudfiles.container obj
     param: file as a string (a path)
     """
-    def do_put(file):
-        container.create_object(os.path.basename(file)).load_from_filename(file, callback=file_progress)
-
-    if does_file_exist(container, file):
-        if ask_yes_no("File exists: Overwrite?"):
-            do_put(file)
-    else:
-        do_put(file)
+    container.create_object(os.path.basename(file)).load_from_filename(file, callback=file_progress)
 
 
-def get_file(container, dir, file):
+def download_file(container, dir, file):
     """ Get actions to download from CF
     param: container as cloudfiles.container obj
     param: dir as a string (a path to put the file)
@@ -241,25 +239,32 @@ def get_file(container, dir, file):
     container.get_object(file).save_to_filename(path_to_file, callback=file_progress)
 
 
+def put_file(container, file_list):
+    def go(container, f):
+        f_basename = os.path.basename(f)
+        sys.stdout.write("Putting %s\t\t " % f_basename)
+        sys.stdout.write('%\b\b\b\b'), sys.stdout.flush()
+        upload_file(container, f)
+        sys.stdout.write("\b\b\b.......Done!\n"), sys.stdout.flush()
+
+    for f in file_list:
+        if does_file_exist(container, f):
+            if ask_yes_no("%s exists: Overwrite?" % os.path.basename(f)):
+                go(container, f)
+            else:
+                continue
+        else:
+            go(container, f)
+
+
 def put_action(args, creds):
     """ Execute file putting actions into CF
     param: args as a parsed args obj
     param: creds as tuple in form of (user, apikey)
     """
-    # Boilerplate go-connect cf_conn stuff, then grab our container obj
     cf_conn = do_rax_connection(creds)
     select_container = get_container(cf_conn, args.container)
-
-    # Build a list of everything but directories
-    files = [ f for f in args.file if not os.path.isdir(f) ]
-
-    # Put files, plus a little verbosity to let people know we're doing something
-    for f in files:
-        f_basename = os.path.basename(f)
-        sys.stdout.write("Putting %s\t\t " % f_basename)
-        sys.stdout.write('%\b\b\b\b'), sys.stdout.flush()
-        put_file(select_container, f)
-        sys.stdout.write("\b\b\b.......Done!\n"), sys.stdout.flush()
+    put_file(select_container, [ f for f in args.file if not os.path.isdir(f) ])
 
 
 def get_action(args, creds):
@@ -281,7 +286,7 @@ def get_action(args, creds):
     for file in args.file:
         sys.stdout.write("Getting %s\t\t " % file)
         sys.stdout.write('%\b\b\b\b'), sys.stdout.flush()
-        get_file(selected_container, dir, file)
+        download_file(selected_container, dir, file)
         sys.stdout.write("\b\b\b.......Done!\n"), sys.stdout.flush()
 
 
