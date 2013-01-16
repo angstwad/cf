@@ -36,7 +36,6 @@ __version__ = '0.35'
 class CredentialsException(Exception):
     def __init__(self, message):
         self.message = message
-
     def message(self):
         return self.message
 
@@ -51,8 +50,6 @@ def ask_yes_no(question):
 
 
 def print_iterable(iterable):
-    """ param: iterable object
-    """
     for item in iterable:
         print item
 
@@ -278,11 +275,8 @@ def get_action(args, creds):
     elif args.dest is not None:
         dir = os.path.abspath(args.dest) + '/'
 
-    # Boilerplate go-connect cf_conn stuff, then grab our container obj
     cf_conn = do_rax_connection(creds)
     selected_container = get_container(cf_conn, args.container)
-
-    # Get files, plus a little verbosity to let people know we're doing something
     for file in args.file:
         sys.stdout.write("Getting %s\t\t " % file)
         sys.stdout.write('%\b\b\b\b'), sys.stdout.flush()
@@ -294,7 +288,6 @@ def config_action(args, creds):
     """ Action function for $ cf config --args stuff.  Creates config, tests login credentials. """
     if args.create_config is True:
         create_config()
-
     # We check for None in creds because action_dispatch() calls this function with None as an arg
     # when creating a config file.
     if args.test_login is True and creds is not None:
@@ -375,6 +368,11 @@ def create_config():
     config.add_section('API_Info')
     config.set('API_Info', 'username', 'someuser')
     config.set('API_Info', 'apikey', 'd1774cf48bec77a0a489a4b124c3a6478876b610')
+
+    if os.path.exists(cfgfile):
+        if not ask_yes_no("Config file already exists. Overwrite?"):
+            sys.exit(0)
+
     try:
         with open(cfgfile, 'w') as configfile:
             config.write(configfile)
