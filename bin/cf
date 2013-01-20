@@ -31,7 +31,7 @@ except ImportError as e:
     sys.exit(1)
 
 __author__ = 'Paul Durivage <paul durivage at gmail dot com>'
-__version__ = '0.35'
+__version__ = '0.40'
 
 class CredentialsException(Exception):
     def __init__(self, message):
@@ -201,15 +201,18 @@ def list_action(args, creds):
         raise cloudfiles.errors.NoSuchContainer('No container found')
 
 
-def does_file_exist(container, file, loc='remote'):
-    if loc == 'remote':
+def does_file_exist(container, file, loc=None):
+    if loc is None:
         if os.path.basename(file) in [ obj.name for obj in get_container_objects(container) ]:
             return True
         else:
             return False
     else:
-        pass
-
+        f = str(loc) + str(file)
+        if os.path.exists(f):
+            return True
+        else:
+            return False
 
 def file_progress(*args):
     # TODO: Make this clearer and more efficient
@@ -226,20 +229,9 @@ def upload_file(container, file):
     container.create_object(os.path.basename(file)).load_from_filename(file, callback=file_progress)
 
 
-def download_file(container, dir, file):
-    """ Get actions to download from CF
-    param: container as cloudfiles.container obj
-    param: dir as a string (a path to put the file)
-    param: file as a string
-    """
-    path_to_file = str(dir + file)
-    container.get_object(file).save_to_filename(path_to_file, callback=file_progress)
-
-
 def put_file(container, file_list):
     def go(container, f):
-        f_basename = os.path.basename(f)
-        sys.stdout.write("Putting %s\t\t " % f_basename)
+        sys.stdout.write("Putting %s\t\t " % os.path.basename(f))
         sys.stdout.write('%\b\b\b\b'), sys.stdout.flush()
         upload_file(container, f)
         sys.stdout.write("\b\b\b.......Done!\n"), sys.stdout.flush()
@@ -264,6 +256,33 @@ def put_action(args, creds):
     put_file(select_container, [ f for f in args.file if not os.path.isdir(f) ])
 
 
+def download_file(container, dir, file):
+        """ Get actions to download from CF
+        param: container as cloudfiles.container obj
+        param: dir as a string (a path to put the file)
+        param: file as a string
+        """
+        path_to_file = str(dir + file)
+        container.get_object(file).save_to_filename(path_to_file, callback=file_progress)
+
+
+def get_file(container, dest, file_list):
+    def go(container, f):
+        sys.stdout.write("Getting %s\t\t " % f)
+        sys.stdout.write('%\b\b\b\b'), sys.stdout.flush()
+        download_file(container, dest, f)
+        sys.stdout.write("\b\b\b.......Done!\n"), sys.stdout.flush()
+
+    for f in file_list:
+        if does_file_exist(container, f, loc=dest):
+            if ask_yes_no("%s exists: Overwrite?" % f):
+                go(container, f)
+            else:
+                continue
+        else:
+            go(container, f)
+
+
 def get_action(args, creds):
     """ File getting actions from CF
     param: args as a parsed args obj
@@ -271,17 +290,13 @@ def get_action(args, creds):
     """
     # Make a proper file path with a trailing /.  Unix-y.
     if args.dest is None:
-        dir = os.getcwd() + '/'
+        dest = os.getcwd() + '/'
     elif args.dest is not None:
-        dir = os.path.abspath(args.dest) + '/'
+        dest = os.path.abspath(args.dest) + '/'
 
     cf_conn = do_rax_connection(creds)
     selected_container = get_container(cf_conn, args.container)
-    for file in args.file:
-        sys.stdout.write("Getting %s\t\t " % file)
-        sys.stdout.write('%\b\b\b\b'), sys.stdout.flush()
-        download_file(selected_container, dir, file)
-        sys.stdout.write("\b\b\b.......Done!\n"), sys.stdout.flush()
+    get_file(selected_container, dest, [ f for f in args.file ])
 
 
 def config_action(args, creds):
