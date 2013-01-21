@@ -141,7 +141,6 @@ def cont_action(args, creds):
 
 
 def cont_list_objects(cf_conn, select_container):
-    print "in"
     try:
         select_container = get_container(cf_conn, select_container)
     except cloudfiles.errors.NoSuchContainer as e:
