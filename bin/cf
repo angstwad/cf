@@ -182,7 +182,7 @@ def obj_action(args, creds):
         # Delete obj
     if args.delete:
         obj_delete(args.file, selected_container)
-    
+
 
 def list_action(args, creds):
     """ Actions for any "list" request
@@ -404,7 +404,6 @@ def config_parser():
     configuration file.  Throws a credentials exception if the file does not exist, or if the config file has not been
     change from the default stuff we put in there at creation-time.
     """
-
     def is_default_config(user, apikey):
         """ This nested function checks if it looks like the default config hasn't been modified from
         it's creation-time example/defaults, so that we don't use these BS creds.

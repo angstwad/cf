@@ -19,17 +19,17 @@ In the future, I hope it'll also:
 
 ## Installation
 
-### With git:
-
-    $ git clone https://github.com/angstwad/cf.git
-    $ cd cf/
-    $ sudo python ./setup.py install
-
 ### With pip or easy_install:
 
 `$ sudo pip install cf`   
 **OR**    
 `$ sudo easy_install cf`
+
+### With git:
+
+    $ git clone https://github.com/angstwad/cf.git
+    $ cd cf/
+    $ sudo python ./setup.py install
 
 ### Requires
 #### python-cloudfiles
@@ -74,7 +74,7 @@ Credentials supplied as arguments override a config file or enviroment variables
 
 ## Info
 
-* **Be careful:** Files can be overwritten if they have the same name -- there is no overwrite checking in place at this time (version 0.35)
+* **It does now check for overwrites!**
 * Haven't tested on Windows.  I don't even have a clue if it'll work for you.
 
 ## License
