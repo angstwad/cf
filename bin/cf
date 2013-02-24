@@ -66,7 +66,7 @@ def do_rax_connection(creds):
         # Returns connection object
         return cloudfiles.get_connection(creds[0], creds[1])
     except cloudfiles.errors.AuthenticationFailed as e:
-        print "Authentication to the Cloud Files API has failed: " + repr(e)
+        print "Authentication to the Cloud Files API has failed: " + e.message
     except cloudfiles.errors.AuthenticationError as e:
         print "Authentication to the Cloud Files API has failed: there was an unspecified error."
         print e.message
