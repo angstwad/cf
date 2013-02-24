@@ -31,11 +31,13 @@ except ImportError as e:
     sys.exit(1)
 
 __author__ = 'Paul Durivage <paul durivage at gmail dot com>'
-__version__ = '0.40'
+__version__ = '0.40.1'
+
 
 class CredentialsException(Exception):
     def __init__(self, message):
         self.message = message
+
     def message(self):
         return self.message
 
@@ -64,7 +66,7 @@ def do_rax_connection(creds):
         # Returns connection object
         return cloudfiles.get_connection(creds[0], creds[1])
     except cloudfiles.errors.AuthenticationFailed as e:
-        print "Authentication to the Cloud Files API has failed: " + e.message
+        print "Authentication to the Cloud Files API has failed: " + repr(e)
     except cloudfiles.errors.AuthenticationError as e:
         print "Authentication to the Cloud Files API has failed: there was an unspecified error."
         print e.message
@@ -153,13 +155,13 @@ def cont_list_objects(cf_conn, select_container):
 
 def obj_delete(selected_file, select_container):
     """ Object deletion on a remote container
-    param: file as list of strings
-    param: selected_container as cloudfiles.container obj
+    :param selected_file: file as list of strings
+    :param select_container: as cloudfiles.container obj
     """
     try:
-        for file in selected_file:
-            select_container.delete_object(file)
-            print "Deleted '%s'." % file
+        for the_file in selected_file:
+            select_container.delete_object(the_file)
+            print "Deleted '%s'." % the_file
     except cloudfiles.errors.ResponseError as e:
         print "Error %s, code: %s." % (e.reason, e.status)
     except:
@@ -201,14 +203,14 @@ def list_action(args, creds):
         raise cloudfiles.errors.NoSuchContainer('No container found')
 
 
-def does_file_exist(container, file, loc=None):
+def does_file_exist(container, the_file, loc=None):
     if loc is None:
-        if os.path.basename(file) in [ obj.name for obj in get_container_objects(container) ]:
+        if os.path.basename(the_file) in [obj.name for obj in get_container_objects(container)]:
             return True
         else:
             return False
     else:
-        f = str(loc) + str(file)
+        f = str(loc) + str(the_file)
         if os.path.exists(f):
             return True
         else:
@@ -221,12 +223,15 @@ def file_progress(*args):
     sys.stdout.write('\b' * len(num)), sys.stdout.flush()
 
 
-def upload_file(container, file):
+def upload_file(container, the_file):
     """ Create a remote object and put a local file into that object
     param: container as cloudfiles.container obj
     param: file as a string (a path)
     """
-    container.create_object(os.path.basename(file)).load_from_filename(file, callback=file_progress)
+    try:
+        container.create_object(os.path.basename(the_file)).load_from_filename(the_file, callback=file_progress)
+    except IOError as e:
+            print "Local error putting file: %s" % e.strerror
 
 
 def put_file(container, file_list):
@@ -253,17 +258,23 @@ def put_action(args, creds):
     """
     cf_conn = do_rax_connection(creds)
     select_container = get_container(cf_conn, args.container)
-    put_file(select_container, [ f for f in args.file if not os.path.isdir(f) ])
+    if not args.abspath or not args.relpath:
+        put_file(select_container, [f for f in args.file if not os.path.isdir(f)])
+    else:
+        print "not implemented."
 
 
-def download_file(container, dir, file):
+def download_file(container, the_dir, the_file):
         """ Get actions to download from CF
         param: container as cloudfiles.container obj
         param: dir as a string (a path to put the file)
         param: file as a string
         """
-        path_to_file = str(dir + file)
-        container.get_object(file).save_to_filename(path_to_file, callback=file_progress)
+        path_to_file = str(the_dir + the_file)
+        try:
+            container.get_object(the_file).save_to_filename(path_to_file, callback=file_progress)
+        except IOError as e:
+            print "Local error saving file: %s" % e.strerror
 
 
 def get_file(container, dest, file_list):
@@ -296,7 +307,7 @@ def get_action(args, creds):
 
     cf_conn = do_rax_connection(creds)
     selected_container = get_container(cf_conn, args.container)
-    get_file(selected_container, dest, [ f for f in args.file ])
+    get_file(selected_container, dest, [f for f in args.file])
 
 
 def config_action(args, creds):
@@ -307,7 +318,7 @@ def config_action(args, creds):
     # when creating a config file.
     if args.test_login is True and creds is not None:
         if isinstance(do_rax_connection(creds), cloudfiles.Connection):
-            print "Successfully authenticated to Rackspace Cloud Files.\n"
+            print ">>> Successfully authenticated to Rackspace Cloud Files."
 
 
 def arg_parser():
@@ -343,6 +354,8 @@ def arg_parser():
     put_parser = subparser.add_parser('put', help='put actions')
     put_parser.add_argument('container', action='store', help='container to put file(s) into')
     put_parser.add_argument('file', nargs='+', help='file(s) to put')
+    put_parser.add_argument('--abspath', action='store_true', help='name files with absolute path')
+    put_parser.add_argument('--relpath', action='store_true', help='name files with relative path')
     put_parser.set_defaults(func=put_action)
 
     # Get-file arguments
@@ -361,12 +374,11 @@ def arg_parser():
 
     # Credentails arguments
     creds_group = parser.add_argument_group(title="Login credentials arguments",
-        description="The config file and environment variables may also be used in lieu of specifying command line arguments. See http://github.com/angstwad/cf for more information.")
+        description="""The config file and environment variables may also be used in lieu of specifying command line arguments. \See http://github.com/angstwad/cf for more information.""")
     creds_group.add_argument('--user', help='Username to use with RAX CF API')
     creds_group.add_argument('--apikey', help='API key to use against RAX CF API')
 
     # Optional Arguments
-    parser.add_argument('--create-config', action='store_true')
     parser.add_argument('-V', '--version', action='version', version="cf " + __version__,
         help="Print the version and exit")
 
@@ -444,22 +456,16 @@ def credentialing(args):
         user.append(args.user)
     else:
         user.append(None)
-    try:
-        if os.environ['CF_USER']:
-            user.append(os.environ['CF_USER'])
-    except KeyError:
-        user.append(None)
+
+    user.append(os.getenv('CF_USER'))
 
     # Grab API keys next
     if args.apikey:
         apikey.append(args.apikey)
     else:
         apikey.append(None)
-    try:
-        if os.environ['CF_APIKEY']:
-            apikey.append(os.environ['CF_APIKEY'])
-    except KeyError:
-        apikey.append(None)
+
+    apikey.append(os.getenv('CF_APIKEY'))
 
     def extrapolate(the_list):
         return filter(lambda x: x is not None, the_list)
