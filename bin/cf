@@ -31,7 +31,7 @@ except ImportError as e:
     sys.exit(1)
 
 __author__ = 'Paul Durivage <paul durivage at gmail dot com>'
-__version__ = '0.40'
+__version__ = '0.40.1'
 
 
 class CredentialsException(Exception):
@@ -66,7 +66,7 @@ def do_rax_connection(creds):
         # Returns connection object
         return cloudfiles.get_connection(creds[0], creds[1])
     except cloudfiles.errors.AuthenticationFailed as e:
-        print "Authentication to the Cloud Files API has failed: " + e.message
+        print "Authentication to the Cloud Files API has failed: " + repr(e)
     except cloudfiles.errors.AuthenticationError as e:
         print "Authentication to the Cloud Files API has failed: there was an unspecified error."
         print e.message
@@ -228,7 +228,10 @@ def upload_file(container, the_file):
     param: container as cloudfiles.container obj
     param: file as a string (a path)
     """
-    container.create_object(os.path.basename(the_file)).load_from_filename(the_file, callback=file_progress)
+    try:
+        container.create_object(os.path.basename(the_file)).load_from_filename(the_file, callback=file_progress)
+    except IOError as e:
+            print "Local error putting file: %s" % e.strerror
 
 
 def put_file(container, file_list):
@@ -268,7 +271,10 @@ def download_file(container, the_dir, the_file):
         param: file as a string
         """
         path_to_file = str(the_dir + the_file)
-        container.get_object(the_file).save_to_filename(path_to_file, callback=file_progress)
+        try:
+            container.get_object(the_file).save_to_filename(path_to_file, callback=file_progress)
+        except IOError as e:
+            print "Local error saving file: %s" % e.strerror
 
 
 def get_file(container, dest, file_list):
