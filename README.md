@@ -44,7 +44,7 @@ The setup.py script will attempt to download and install the *python-cloudfiles*
 
 Credentials (username and API key) are supplied three ways:
 
-* Arguments: `$ cf --username <u> --apikey <u>`
+* Arguments: `$ cf --username <username> --apikey <apikey>`
 * Environment variables: **CF_USER** and **CF_APIKEY**
 * Config file at `$HOME/.cf`, created by running `$ cf config --create-config`
 
