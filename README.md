@@ -44,7 +44,7 @@ The setup.py script will attempt to download and install the *python-cloudfiles*
 
 Credentials (username and API key) are supplied three ways:
 
-* Arguments: `$ cf --username <u> --apikey <u>`
+* Arguments: `$ cf --username <username> --apikey <apikey>`
 * Environment variables: **CF_USER** and **CF_APIKEY**
 * Config file at `$HOME/.cf`, created by running `$ cf config --create-config`
 
@@ -70,7 +70,7 @@ Credentials supplied as arguments override a config file or enviroment variables
 ##### Or put it someplace special with the `-d` flag!    
 `$ cf get that_old_container pic1.jpg file2.html -d /home/user`
 ##### Delete remote objects
-`$ cf obj someContainer file1 file2`
+`$ cf obj someContainer [ --delete | -d ] file1 file2`
 
 ## Info
 
