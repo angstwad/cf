@@ -573,7 +573,7 @@ def action_dispatch(args):
         try:
             creds = credentialing(args)
         except CredentialsException as e:
-            print e.message
+            raise SystemExit(e.message)
 
         # Call out to the appropriate *_action function to carry out our
         # desired functionality
