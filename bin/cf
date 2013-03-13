@@ -40,6 +40,9 @@ class CredentialsException(Exception):
     def __init__(self, message):
         self.message = message
 
+    def __str__(self):
+      return self.message
+
     def message(self):
         return self.message
 
@@ -160,8 +163,7 @@ def cont_list_objects(cf_conn, select_container):
     try:
         select_container = get_container(cf_conn, select_container)
     except cloudfiles.errors.NoSuchContainer as e:
-        print e.message
-        sys.exit(1)
+        raise SystemExit(e)
     else:
         print_iterable([obj.name for obj in
                         get_container_objects(select_container)])
@@ -194,8 +196,7 @@ def obj_action(args, creds):
     try:
         selected_container = get_container(cf_conn, args.container)
     except cloudfiles.errors.NoSuchContainer as e:
-        print e.message
-        sys.exit(1)
+        raise SystemExit(e)
     except:
         raise
         # Delete obj
@@ -573,7 +574,7 @@ def action_dispatch(args):
         try:
             creds = credentialing(args)
         except CredentialsException as e:
-            raise SystemExit(e.message)
+            raise SystemExit(e)
 
         # Call out to the appropriate *_action function to carry out our
         # desired functionality
