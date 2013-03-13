@@ -40,6 +40,9 @@ class CredentialsException(Exception):
     def __init__(self, message):
         self.message = message
 
+    def __str__(self):
+      return self.message
+
     def message(self):
         return self.message
 
@@ -68,9 +71,10 @@ def do_rax_connection(creds):
     """
     try:
         # Returns connection object
-        return cloudfiles.get_connection(creds[0], creds[1])
+        return cloudfiles.get_connection(*creds)
     except cloudfiles.errors.AuthenticationFailed as e:
-        print "Authentication to the Cloud Files API has failed: " + e.message
+        print ("Authentication to the Cloud Files API has failed: %s" %
+               e.message)
     except cloudfiles.errors.AuthenticationError as e:
         print ("Authentication to the Cloud Files API has failed: there was"
                " an unspecified error.")
@@ -159,8 +163,7 @@ def cont_list_objects(cf_conn, select_container):
     try:
         select_container = get_container(cf_conn, select_container)
     except cloudfiles.errors.NoSuchContainer as e:
-        print e.message
-        sys.exit(1)
+        raise SystemExit(e)
     else:
         print_iterable([obj.name for obj in
                         get_container_objects(select_container)])
@@ -193,8 +196,7 @@ def obj_action(args, creds):
     try:
         selected_container = get_container(cf_conn, args.container)
     except cloudfiles.errors.NoSuchContainer as e:
-        print e.message
-        sys.exit(1)
+        raise SystemExit(e)
     except:
         raise
         # Delete obj
@@ -228,7 +230,7 @@ def does_file_exist(container, the_file, loc=None):
         else:
             return False
     else:
-        f = str(loc) + str(the_file)
+        f = '%s%s' % (loc, the_file)
         if os.path.exists(f):
             return True
         else:
@@ -294,7 +296,7 @@ def download_file(container, the_dir, the_file):
         param: file as a string
 
         """
-        path_to_file = str(the_dir + the_file)
+        path_to_file = '%s%s' % (the_dir, the_file)
         try:
             (container.get_object(the_file)
                 .save_to_filename(path_to_file, callback=file_progress))
@@ -327,9 +329,9 @@ def get_action(args, creds):
     """
     # Make a proper file path with a trailing /.  Unix-y.
     if args.dest is None:
-        dest = os.getcwd() + '/'
+        dest = '%s/' % os.getcwd()
     elif args.dest is not None:
-        dest = os.path.abspath(args.dest) + '/'
+        dest = '%s/' % os.path.abspath(args.dest)
 
     cf_conn = do_rax_connection(creds)
     selected_container = get_container(cf_conn, args.container)
@@ -441,16 +443,19 @@ def create_config():
     already exists - simply overwrites it with defaults.
 
     """
-    cfgfile = os.environ['HOME'] + '/.cf'
+    cfgfile = os.path.expanduser('~/.cf')
     config = ConfigParser.RawConfigParser()
     config.add_section('API_Info')
     config.set('API_Info', 'username', 'someuser')
     config.set('API_Info', 'apikey',
                'd1774cf48bec77a0a489a4b124c3a6478876b610')
 
-    if os.path.exists(cfgfile):
+    if os.path.isfile(cfgfile):
         if not ask_yes_no("Config file already exists. Overwrite?"):
             sys.exit(0)
+    elif os.path.exists(cfgfile):
+        print '~/.cf exists but is not a file'
+        sys.exit(1)
 
     try:
         with open(cfgfile, 'w') as configfile:
@@ -484,14 +489,14 @@ def config_parser():
                                        ' changed from default.')
 
     # Define the config file as $HOME/.cf
-    cfgfile = os.environ['HOME'] + '/.cf'
+    cfgfile = os.path.expanduser('~/.cf')
 
     # If the config file doesn't exist
-    if not os.path.exists(cfgfile):
+    if not os.path.isfile(cfgfile):
         raise CredentialsException('Missing config file at ~/.cf')
 
     # If the config file exists, read it
-    elif os.path.exists(cfgfile):
+    elif os.path.isfile(cfgfile):
         config = ConfigParser.RawConfigParser()
         config.read(cfgfile)
         user = config.get('API_Info', 'username')
@@ -572,7 +577,7 @@ def action_dispatch(args):
         try:
             creds = credentialing(args)
         except CredentialsException as e:
-            print e.message
+            raise SystemExit(e)
 
         # Call out to the appropriate *_action function to carry out our
         # desired functionality
