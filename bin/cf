@@ -450,9 +450,12 @@ def create_config():
     config.set('API_Info', 'apikey',
                'd1774cf48bec77a0a489a4b124c3a6478876b610')
 
-    if os.path.exists(cfgfile):
+    if os.path.isfile(cfgfile):
         if not ask_yes_no("Config file already exists. Overwrite?"):
             sys.exit(0)
+    elif os.path.exists(cfgfile):
+        print '~/.cf exists but is not a file'
+        sys.exit(1)
 
     try:
         with open(cfgfile, 'w') as configfile:
@@ -489,11 +492,11 @@ def config_parser():
     cfgfile = os.path.expanduser('~/.cf')
 
     # If the config file doesn't exist
-    if not os.path.exists(cfgfile):
+    if not os.path.isfile(cfgfile):
         raise CredentialsException('Missing config file at ~/.cf')
 
     # If the config file exists, read it
-    elif os.path.exists(cfgfile):
+    elif os.path.isfile(cfgfile):
         config = ConfigParser.RawConfigParser()
         config.read(cfgfile)
         user = config.get('API_Info', 'username')
