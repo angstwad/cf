@@ -70,7 +70,8 @@ def do_rax_connection(creds):
         # Returns connection object
         return cloudfiles.get_connection(creds[0], creds[1])
     except cloudfiles.errors.AuthenticationFailed as e:
-        print "Authentication to the Cloud Files API has failed: " + e.message
+        print ("Authentication to the Cloud Files API has failed: %s" %
+               e.message)
     except cloudfiles.errors.AuthenticationError as e:
         print ("Authentication to the Cloud Files API has failed: there was"
                " an unspecified error.")
@@ -228,7 +229,7 @@ def does_file_exist(container, the_file, loc=None):
         else:
             return False
     else:
-        f = str(loc) + str(the_file)
+        f = '%s%s' % (loc, the_file)
         if os.path.exists(f):
             return True
         else:
@@ -294,7 +295,7 @@ def download_file(container, the_dir, the_file):
         param: file as a string
 
         """
-        path_to_file = str(the_dir + the_file)
+        path_to_file = '%s%s' % (the_dir, the_file)
         try:
             (container.get_object(the_file)
                 .save_to_filename(path_to_file, callback=file_progress))
@@ -327,9 +328,9 @@ def get_action(args, creds):
     """
     # Make a proper file path with a trailing /.  Unix-y.
     if args.dest is None:
-        dest = os.getcwd() + '/'
+        dest = '%s/' % os.getcwd()
     elif args.dest is not None:
-        dest = os.path.abspath(args.dest) + '/'
+        dest = '%s/' % os.path.abspath(args.dest)
 
     cf_conn = do_rax_connection(creds)
     selected_container = get_container(cf_conn, args.container)
@@ -441,7 +442,7 @@ def create_config():
     already exists - simply overwrites it with defaults.
 
     """
-    cfgfile = os.environ['HOME'] + '/.cf'
+    cfgfile = os.path.expanduser('~/.cf')
     config = ConfigParser.RawConfigParser()
     config.add_section('API_Info')
     config.set('API_Info', 'username', 'someuser')
@@ -484,7 +485,7 @@ def config_parser():
                                        ' changed from default.')
 
     # Define the config file as $HOME/.cf
-    cfgfile = os.environ['HOME'] + '/.cf'
+    cfgfile = os.path.expanduser('~/.cf')
 
     # If the config file doesn't exist
     if not os.path.exists(cfgfile):
