@@ -1,3 +1,7 @@
+# WARNING
+
+Do yourself a favor - use a project that is well maintained and loved, rather than this languishing tool.  There are now many projects that are far superior and far better maintained than cf.  I personally like [Swiftly](https://github.com/gholt/swiftly) and [Posthaste](https://github.com/rackerlabs/posthaste).  The former is written by an original, core dev on Swift, and the latter is one to which I've contributed.  You may find one of them matches your use case. 
+
 ## cf    
 #####A Command-Line Interface to Rackspace Cloud Files
 
