@@ -81,13 +81,14 @@ def do_rax_connection(creds):
         print e.message
 
 
-def get_container_objects(container_obj):
+def get_container_objects(container_obj, prefix=None, limit=None,
+                          marker=None, path=None, delimiter=None):
     """ Handles retrieval of a container's file objects
     param: selected_container as cloudfiles.container object
     Returns: cloudfiles.storage_objects obj
 
     """
-    return container_obj.get_objects()
+    return container_obj.get_objects(prefix, limit, marker, path, delimiter)
 
 
 def get_container(cf_conn, requested_container):
@@ -159,15 +160,18 @@ def cont_action(args, creds):
         pass
 
 
-def cont_list_objects(cf_conn, select_container):
+def cont_list_objects(cf_conn, select_container, prefix=None,
+                      limit=None, marker=None, path=None, delimiter=None):
     try:
         select_container = get_container(cf_conn, select_container)
     except cloudfiles.errors.NoSuchContainer as e:
         raise SystemExit(e)
     else:
-        print_iterable([obj.name for obj in
-                        get_container_objects(select_container)])
-        print get_container_objects(select_container)
+        objs = get_container_objects(select_container, prefix, limit,
+                                      marker, path, delimiter)
+
+        print 'total ' + str(objs.__len__())
+        print_iterable([obj.name for obj in objs])
 
 
 def obj_delete(selected_file, select_container):
@@ -213,7 +217,9 @@ def list_action(args, creds):
     cf_conn = do_rax_connection(creds)
     # List container objects
     if args.container != "all":
-        cont_list_objects(cf_conn, args.container)
+        cont_list_objects(cf_conn, args.container, args.prefix,
+                          args.limit, args.marker, args.path,
+                          args.delimiter)
 
     # Just list containers
     elif args.container == "all":
@@ -387,6 +393,22 @@ def arg_parser():
     list_parser.add_argument('container', metavar="[container] or 'all'",
                              help="container name, or 'all' to list all"
                                   " containers.")
+    list_parser.add_argument('--prefix', dest='prefix',
+                            help='file prefix',
+                            default=None)
+    list_parser.add_argument('--limit', dest='limit',
+                            help='limit of entries to display',
+                            default=None)
+    list_parser.add_argument('--marker', dest='marker', 
+                            help='filename to use as marker (offset in the'
+                            'list defined by a filename, in other words)',
+                            default=None)
+    list_parser.add_argument('--path', dest='path',
+                            help='path to list in the container',
+                            default=None)
+    list_parser.add_argument('--delimiter', dest='delimiter',
+                            help='nested directory delimiter character',
+                            default=None)
     list_parser.set_defaults(func=list_action)
 
     # Put-file arguments
