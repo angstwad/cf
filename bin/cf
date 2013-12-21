@@ -30,7 +30,7 @@ try:
 except ImportError as e:
     print ("cf requires the python-cloudfiles module -- please install this"
            " module.")
-    sys.exit(1)
+    sys.exit(3)
 
 __author__ = 'Paul Durivage <paul durivage at gmail dot com>'
 __version__ = '0.40.1'
@@ -75,10 +75,12 @@ def do_rax_connection(creds):
     except cloudfiles.errors.AuthenticationFailed as e:
         print ("Authentication to the Cloud Files API has failed: %s" %
                e.message)
+        sys.exit(1)
     except cloudfiles.errors.AuthenticationError as e:
         print ("Authentication to the Cloud Files API has failed: there was"
                " an unspecified error.")
         print e.message
+        sys.exit(3)
 
 
 def get_container_objects(container_obj):
@@ -102,7 +104,7 @@ def get_container(cf_conn, requested_container):
         if str(item).strip() == requested_container:
             return containers[index]
     # If the container doesn't exist
-    raise cloudfiles.errors.NoSuchContainer("Container not found: %s" %
+    raise cloudfiles.errors.NoSuchContainer("No such container: %s" %
                                             requested_container)
 
 
@@ -125,7 +127,8 @@ def cont_create(cf_conn, container_name):
         new_container = cf_conn.create_container(container_name,
                                                  error_on_existing=True)
     except cloudfiles.errors.ContainerExists as e:
-        print "Container '%s' already exists." % e.message
+        print "Could not create '%s': Container already exists." % e
+        sys.exit(2)
     if isinstance(new_container, cloudfiles.Container):
         print "Container created successfully."
 
@@ -139,7 +142,11 @@ def cont_delete(cf_conn, container_name):
     try:
         cf_conn.delete_container(container_name)
     except cloudfiles.errors.ContainerNotEmpty as e:
-        print "Could not delete '%s': Container Not Empty" % e.container_name
+        print "Could not delete '%s': Container not empty" % e.container_name
+        sys.exit(2)
+    except cloudfiles.errors.NoSuchContainer as e:
+        print "Could not delete '%s': No such container" % container_name
+        sys.exit(2)
     else:
         print "%s deleted successfully." % container_name
 
@@ -163,7 +170,8 @@ def cont_list_objects(cf_conn, select_container):
     try:
         select_container = get_container(cf_conn, select_container)
     except cloudfiles.errors.NoSuchContainer as e:
-        raise SystemExit(e)
+        print e
+        sys.exit(2)
     else:
         print_iterable([obj.name for obj in
                         get_container_objects(select_container)])
@@ -182,6 +190,7 @@ def obj_delete(selected_file, select_container):
             print "Deleted '%s'." % the_file
     except cloudfiles.errors.ResponseError as e:
         print "Error %s, code: %s." % (e.reason, e.status)
+        sys.exit(2)
     except:
         raise
 
@@ -196,7 +205,8 @@ def obj_action(args, creds):
     try:
         selected_container = get_container(cf_conn, args.container)
     except cloudfiles.errors.NoSuchContainer as e:
-        raise SystemExit(e)
+        print e
+        sys.exit(2)
     except:
         raise
         # Delete obj
@@ -254,7 +264,8 @@ def upload_file(container, the_file):
         (container.create_object(os.path.basename(the_file))
             .load_from_filename(the_file, callback=file_progress))
     except IOError as e:
-            print "Local error putting file: %s" % e.strerror
+            print "Local error putting file: %s" % e
+            sys.exit(3)
 
 
 def put_file(container, file_list):
@@ -262,7 +273,7 @@ def put_file(container, file_list):
         sys.stdout.write("Putting %s\t\t " % os.path.basename(f))
         sys.stdout.write('%\b\b\b\b'), sys.stdout.flush()
         upload_file(container, f)
-        sys.stdout.write("\b\b\b.......Done!\n"), sys.stdout.flush()
+        sys.stdout.write("\b\b\b.......Done.\n"), sys.stdout.flush()
 
     for f in file_list:
         if does_file_exist(container, f):
@@ -287,6 +298,7 @@ def put_action(args, creds):
                  [f for f in args.file if not os.path.isdir(f)])
     else:
         print "not implemented."
+        sys.exit(3)
 
 
 def download_file(container, the_dir, the_file):
@@ -301,7 +313,8 @@ def download_file(container, the_dir, the_file):
             (container.get_object(the_file)
                 .save_to_filename(path_to_file, callback=file_progress))
         except IOError as e:
-            print "Local error saving file: %s" % e.strerror
+            print "Local error saving file: %s" % e
+            sys.exit(3)
 
 
 def get_file(container, dest, file_list):
@@ -309,7 +322,7 @@ def get_file(container, dest, file_list):
         sys.stdout.write("Getting %s\t\t " % f)
         sys.stdout.write('%\b\b\b\b'), sys.stdout.flush()
         download_file(container, dest, f)
-        sys.stdout.write("\b\b\b.......Done!\n"), sys.stdout.flush()
+        sys.stdout.write("\b\b\b.......Done.\n"), sys.stdout.flush()
 
     for f in file_list:
         if does_file_exist(container, f, loc=dest):
@@ -455,7 +468,7 @@ def create_config():
             sys.exit(0)
     elif os.path.exists(cfgfile):
         print '~/.cf exists but is not a file'
-        sys.exit(1)
+        sys.exit(3)
 
     try:
         with open(cfgfile, 'w') as configfile:
@@ -463,7 +476,7 @@ def create_config():
     except IOError as e:
         print ("""Cannot create a configuration file.  Please ensure the
              current user has read/write permissions to %s""", cfgfile)
-        sys.exit(1)
+        sys.exit(3)
     else:
         print "Please edit the configuration at ~/.cf and rerun this program."
 
